@@ -89,8 +89,16 @@ class CookieClicker:
                     golden_cookie.click()
                     self.logger.info("Got the golden cookie!")
                 await asyncio.sleep(1)
-            except (ElementNotInteractableException, ElementClickInterceptedException):
-                self.logger.warning("Golden cookie failed.")
+            except ElementNotInteractableException as e:
+                # refresh the golden cookie container
+                self.logger.error(e.msg.replace("\n", " ").strip())
+                self.logger.warning("Golden cookie failed, refreshing element")
+                self.golden_cookie_container = selector.find_element(
+                    "id", "shimmers", self.chrome_browser.driver, "located"
+                )
+            except ElementClickInterceptedException as e:
+                self.logger.error(e.msg.replace("\n", " ").strip())
+                self.logger.warning("Golden cookie failed, it was likely under the tooltip")
 
     async def check_products(self):
         while True:
@@ -103,10 +111,10 @@ class CookieClicker:
             best = sorted_values[0][1]
             if len(none_owned) and none_owned[0][1]["price"] < best["price"] * 3:
                 best = none_owned[0][1]
-                self.logger.info(f"Getting new building {best['name']}")
+                self.logger.info(f"Going for new building: {best['name']}")
             else:
                 self.logger.info(
-                    f"Current best value {best['name']}, {best['value']:.3E} CpS per C"
+                    f"Current best value: {best['name']}, {best['value']:.3E} CpS per C"
                 )
             products[best["index"]].click()
             # update current values after purchase
