@@ -118,24 +118,14 @@ class CookieClicker:
     async def check_upgrades(self):
         while True:
             try:
-                upgrades_container = selector.find_element(
-                    "id", "upgrades", self.chrome_browser.driver, "located"
-                )
-                upgrades = selector.find_element(
-                    "class",
-                    "upgrade",
-                    upgrades_container,
-                    "all_located",
-                    wait=0,
-                    ignore_timeout=True,
-                )
-                for upgrade in upgrades:
-                    metadata = self.get_upgrade_metadata(upgrade)
-                    if "enabled" in metadata["classes"]:
-                        self.logger.info(f"Buying cheapest upgrade")
-                        upgrades[metadata["index"]].click()
-                        self.logger.info("Updating all product values")
-                        _ = self.update_all_products(iterative=False)
+                upgrades = self.__get_upgrade_list()
+                cheapest_upgrade = upgrades[0]
+                metadata = self.get_upgrade_metadata(cheapest_upgrade)
+                if "enabled" in metadata["classes"]:
+                    self.logger.info(f"Buying cheapest upgrade")
+                    cheapest_upgrade.click()
+                    self.logger.info("Updating all product values")
+                    _ = self.update_all_products(iterative=False)
             except StaleElementReferenceException:
                 self.logger.warning("Upgrade failed.")
 
