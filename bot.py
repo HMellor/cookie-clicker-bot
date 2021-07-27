@@ -92,10 +92,7 @@ class CookieClicker:
             except ElementNotInteractableException as e:
                 # refresh the golden cookie container
                 self.logger.error(e.msg.replace("\n", " ").strip())
-                self.logger.warning("Golden cookie failed, refreshing element")
-                self.golden_cookie_container = selector.find_element(
-                    "id", "shimmers", self.chrome_browser.driver, "located"
-                )
+                self.logger.warning("Golden cookie failed")
             except ElementClickInterceptedException as e:
                 self.logger.error(e.msg.replace("\n", " ").strip())
                 self.logger.warning("Golden cookie failed, it was likely under the tooltip")
