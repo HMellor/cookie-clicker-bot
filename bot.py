@@ -23,6 +23,12 @@ class CookieClicker:
         self.golden_cookie_container = selector.find_element(
             "id", "shimmers", self.chrome_browser.driver, "located"
         )
+        self.upgrades_container = selector.find_element(
+            "id", "upgrades", self.chrome_browser.driver, "located"
+        )
+        self.products_container = selector.find_element(
+            "id", "products", self.chrome_browser.driver, "located"
+        )
 
     def __del__(self):
         self.chrome_browser.close()
@@ -109,7 +115,7 @@ class CookieClicker:
             self.current_values[best["name"]].update(data)
             await asyncio.sleep(60)
 
-    async def check_upgrades(self, level=0):
+    async def check_upgrades(self):
         while True:
             try:
                 upgrades_container = selector.find_element(
@@ -139,7 +145,17 @@ class CookieClicker:
         return selector.find_element(
             "class",
             "product",
-            self.chrome_browser.driver,
+            self.products_container,
+            "all_located",
+            wait=0,
+            ignore_timeout=True,
+        )
+
+    def __get_upgrade_list(self):
+        return selector.find_element(
+            "class",
+            "upgrade",
+            self.upgrades_container,
             "all_located",
             wait=0,
             ignore_timeout=True,
