@@ -23,6 +23,12 @@ class CookieClicker:
         self.golden_cookie_container = selector.find_element(
             "id", "shimmers", self.chrome_browser.driver, "located"
         )
+        self.upgrades_container = selector.find_element(
+            "id", "upgrades", self.chrome_browser.driver, "located"
+        )
+        self.products_container = selector.find_element(
+            "id", "products", self.chrome_browser.driver, "located"
+        )
 
     def __del__(self):
         self.chrome_browser.close()
@@ -83,8 +89,16 @@ class CookieClicker:
                     golden_cookie.click()
                     self.logger.info("Got the golden cookie!")
                 await asyncio.sleep(1)
-            except (ElementNotInteractableException, ElementClickInterceptedException):
-                self.logger.warning("Golden cookie failed.")
+            except ElementNotInteractableException as e:
+                # refresh the golden cookie container
+                self.logger.error(e.msg.replace("\n", " ").strip())
+                self.logger.warning("Golden cookie failed, refreshing element")
+                self.golden_cookie_container = selector.find_element(
+                    "id", "shimmers", self.chrome_browser.driver, "located"
+                )
+            except ElementClickInterceptedException as e:
+                self.logger.error(e.msg.replace("\n", " ").strip())
+                self.logger.warning("Golden cookie failed, it was likely under the tooltip")
 
     async def check_products(self):
         while True:
@@ -97,39 +111,27 @@ class CookieClicker:
             best = sorted_values[0][1]
             if len(none_owned) and none_owned[0][1]["price"] < best["price"] * 3:
                 best = none_owned[0][1]
-                self.logger.info(f"Getting new building {best['name']}")
+                self.logger.info(f"Going for new building: {best['name']}")
             else:
                 self.logger.info(
-                    f"Current best value {best['name']}, {best['value']:.3E} CpS per C"
+                    f"Current best value: {best['name']}, {best['value']:.3E} CpS per C"
                 )
             products[best["index"]].click()
             # update current values after purchase
-            self.__update_tooltip(best["index"])
-            data = self.get_product_data()
-            self.current_values[best["name"]].update(data)
+            self.__update_product_record(best)
             await asyncio.sleep(60)
 
-    async def check_upgrades(self, level=0):
+    async def check_upgrades(self):
         while True:
             try:
-                upgrades_container = selector.find_element(
-                    "id", "upgrades", self.chrome_browser.driver, "located"
-                )
-                upgrades = selector.find_element(
-                    "class",
-                    "upgrade",
-                    upgrades_container,
-                    "all_located",
-                    wait=0,
-                    ignore_timeout=True,
-                )
-                for upgrade in upgrades:
-                    metadata = self.get_upgrade_metadata(upgrade)
-                    if "enabled" in metadata["classes"]:
-                        self.logger.info(f"Buying cheapest upgrade")
-                        upgrades[metadata["index"]].click()
-                        self.logger.info("Updating all product values")
-                        _ = self.update_all_products(iterative=False)
+                upgrades = self.__get_upgrade_list()
+                cheapest_upgrade = upgrades[0]
+                metadata = self.get_upgrade_metadata(cheapest_upgrade)
+                if "enabled" in metadata["classes"]:
+                    self.logger.info(f"Buying cheapest upgrade")
+                    cheapest_upgrade.click()
+                    self.logger.info("Updating all product values")
+                    _ = self.update_all_products(iterative=False)
             except StaleElementReferenceException:
                 self.logger.warning("Upgrade failed.")
 
@@ -139,7 +141,17 @@ class CookieClicker:
         return selector.find_element(
             "class",
             "product",
-            self.chrome_browser.driver,
+            self.products_container,
+            "all_located",
+            wait=0,
+            ignore_timeout=True,
+        )
+
+    def __get_upgrade_list(self):
+        return selector.find_element(
+            "class",
+            "upgrade",
+            self.upgrades_container,
             "all_located",
             wait=0,
             ignore_timeout=True,
@@ -149,6 +161,12 @@ class CookieClicker:
         self.chrome_browser.driver.execute_script(
             f"Game.tooltip.dynamic=1;Game.tooltip.draw(this,function(){{return Game.ObjectsById[{index}].tooltip();}},'store');Game.tooltip.wobble();"
         )
+
+    def __update_product_record(self, metadata):
+        self.__update_tooltip(metadata["index"])
+        data = self.get_product_data()
+        product_record = {metadata["name"]: {**metadata, **data}}
+        self.current_values.update(product_record)
 
     def start(self):
         loop = asyncio.get_event_loop()
@@ -249,9 +267,7 @@ class CookieClicker:
             # update current values
             is_new = metadata["name"] not in self.current_values
             if not iterative or is_new:
-                self.__update_tooltip(metadata["index"])
-                data = self.get_product_data()
-                self.current_values[metadata["name"]] = {**metadata, **data}
+                self.__update_product_record(metadata)
         return products
 
 
