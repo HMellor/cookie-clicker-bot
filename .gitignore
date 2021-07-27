@@ -1,0 +1,5 @@
+.vscode/
+cookie_clicker_data/
+logs/
+extensions/*
+!*.md
