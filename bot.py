@@ -110,9 +110,7 @@ class CookieClicker:
                 )
             products[best["index"]].click()
             # update current values after purchase
-            self.__update_tooltip(best["index"])
-            data = self.get_product_data()
-            self.current_values[best["name"]].update(data)
+            self.__update_product_record(best)
             await asyncio.sleep(60)
 
     async def check_upgrades(self):
@@ -155,6 +153,12 @@ class CookieClicker:
         self.chrome_browser.driver.execute_script(
             f"Game.tooltip.dynamic=1;Game.tooltip.draw(this,function(){{return Game.ObjectsById[{index}].tooltip();}},'store');Game.tooltip.wobble();"
         )
+
+    def __update_product_record(self, metadata):
+        self.__update_tooltip(metadata["index"])
+        data = self.get_product_data()
+        product_record = {metadata["name"]: {**metadata, **data}}
+        self.current_values.update(product_record)
 
     def start(self):
         loop = asyncio.get_event_loop()
@@ -255,9 +259,7 @@ class CookieClicker:
             # update current values
             is_new = metadata["name"] not in self.current_values
             if not iterative or is_new:
-                self.__update_tooltip(metadata["index"])
-                data = self.get_product_data()
-                self.current_values[metadata["name"]] = {**metadata, **data}
+                self.__update_product_record(metadata)
         return products
 
 
