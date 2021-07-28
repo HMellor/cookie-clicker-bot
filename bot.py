@@ -13,6 +13,8 @@ from selenium.common.exceptions import (
 
 
 class CookieClicker:
+    golden_cookie_sleep_seconds = 1
+
     def __init__(self):
         self.current_values = {}
         self.logger = self.configure_logger()
@@ -72,7 +74,12 @@ class CookieClicker:
 
     async def click_forever(self, elem):
         while True:
-            elem.click()
+            try:
+                elem.click()
+            except ElementClickInterceptedException as e:
+                self.logger.error(e.msg.replace("\n", " ").strip())
+                self.logger.warning("Golden cookie blocking big cookie")
+                asyncio.sleep(self.golden_cookie_sleep_seconds)
             await asyncio.sleep(0)
 
     async def click_golden_cookie(self):
@@ -89,14 +96,14 @@ class CookieClicker:
                 if golden_cookie is not None:
                     golden_cookie.click()
                     self.logger.info("Got the golden cookie!")
-                await asyncio.sleep(1)
             except ElementNotInteractableException as e:
                 # refresh the golden cookie container
                 self.logger.error(e.msg.replace("\n", " ").strip())
                 self.logger.warning("Golden cookie failed")
             except ElementClickInterceptedException as e:
                 self.logger.error(e.msg.replace("\n", " ").strip())
-                self.logger.warning("Golden cookie failed, it was likely under the tooltip")
+                self.logger.warning("Golden cookie failed, hidden under tooltip")
+            await asyncio.sleep(self.golden_cookie_sleep_seconds)
 
     async def check_purchases(self):
         while True:
