@@ -103,6 +103,9 @@ class CookieClicker:
             except ElementClickInterceptedException as e:
                 self.logger.error(e.msg.replace("\n", " ").strip())
                 self.logger.warning("Golden cookie failed, hidden under tooltip")
+            except StaleElementReferenceException as e:
+                self.logger.error(e.msg.replace("\n", " ").strip())
+                self.logger.warning("Golden cookie failed")
             await asyncio.sleep(self.golden_cookie_sleep_seconds)
 
     async def check_purchases(self):
