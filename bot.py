@@ -124,7 +124,8 @@ class CookieClicker:
             none_owned = [v for v in current_values if v[1]["owned"] == 0]
             # extract salient products
             best = max(current_values, key=lambda i: i[1]["value"])[1]
-            cheapest_none_owned = min(none_owned, key=lambda i: i[1]["price"])[1]
+            if len(none_owned):
+                cheapest_none_owned = min(none_owned, key=lambda i: i[1]["price"])[1]
             # if we have enough cookies to work towards the next building, do it
             balance = self.__get_balance()
             if len(none_owned) and cheapest_none_owned["price"] < balance * 3:
