@@ -1,4 +1,5 @@
 import os
+import math
 import asyncio
 import logging
 import logging.handlers
@@ -12,6 +13,10 @@ from selenium.common.exceptions import (
 
 
 class CookieClicker:
+    golden_cookie_sleep_seconds = 1
+    big_cookie_sleep_seconds = 0
+    check_purchase_sleep_seconds = 60
+
     def __init__(self):
         self.current_values = {}
         self.logger = self.configure_logger()
@@ -71,8 +76,13 @@ class CookieClicker:
 
     async def click_forever(self, elem):
         while True:
-            elem.click()
-            await asyncio.sleep(0)
+            try:
+                elem.click()
+            except ElementClickInterceptedException as e:
+                self.logger.error(e.msg.replace("\n", " ").strip())
+                self.logger.warning("Golden cookie blocking big cookie")
+                asyncio.sleep(self.golden_cookie_sleep_seconds)
+            await asyncio.sleep(self.big_cookie_sleep_seconds)
 
     async def click_golden_cookie(self):
         while True:
@@ -88,54 +98,65 @@ class CookieClicker:
                 if golden_cookie is not None:
                     golden_cookie.click()
                     self.logger.info("Got the golden cookie!")
-                await asyncio.sleep(1)
             except ElementNotInteractableException as e:
                 # refresh the golden cookie container
                 self.logger.error(e.msg.replace("\n", " ").strip())
-                self.logger.warning("Golden cookie failed, refreshing element")
-                self.golden_cookie_container = selector.find_element(
-                    "id", "shimmers", self.chrome_browser.driver, "located"
-                )
+                self.logger.warning("Golden cookie failed")
             except ElementClickInterceptedException as e:
                 self.logger.error(e.msg.replace("\n", " ").strip())
-                self.logger.warning("Golden cookie failed, it was likely under the tooltip")
+                self.logger.warning("Golden cookie failed, hidden under tooltip")
+            except StaleElementReferenceException as e:
+                self.logger.error(e.msg.replace("\n", " ").strip())
+                self.logger.warning("Golden cookie failed")
+            await asyncio.sleep(self.golden_cookie_sleep_seconds)
 
-    async def check_products(self):
+    async def check_purchases(self):
         while True:
+            upgrades = self.__get_upgrade_list()
+            cheapest_upgrade = upgrades[0]
+            metadata = self.get_upgrade_metadata(cheapest_upgrade)
+            if "enabled" in metadata["classes"]:
+                self.logger.info(
+                    "Buying cheapest upgrade and updating all product values"
+                )
+                cheapest_upgrade.click()
+                _ = self.update_all_products(iterative=False)
+
             products = self.update_all_products(iterative=True)
             # find most cost effective option
-            sorted_values = sorted(
-                self.current_values.items(), key=lambda i: i[1]["value"], reverse=True
-            )
-            none_owned = [v for v in sorted_values if v[1]["owned"] == 0]
-            best = sorted_values[0][1]
-            if len(none_owned) and none_owned[0][1]["price"] < best["price"] * 3:
-                best = none_owned[0][1]
-                self.logger.info(f"Going for new building: {best['name']}")
-            else:
+            current_values = self.current_values.items()
+            none_owned = [v for v in current_values if v[1]["owned"] == 0]
+            # extract salient products
+            best = max(current_values, key=lambda i: i[1]["value"])[1]
+            if len(none_owned):
+                cheapest_none_owned = min(none_owned, key=lambda i: i[1]["price"])[1]
+            # if we have enough cookies to work towards the next building, do it
+            balance = self.__get_balance()
+            if len(none_owned) and cheapest_none_owned["price"] < balance * 3:
+                best = cheapest_none_owned
                 self.logger.info(
-                    f"Current best value: {best['name']}, {best['value']:.3E} CpS per C"
+                    f"Going for new building: {best['name']}, {100*balance/best['price']:.2f}% complete"
                 )
-            products[best["index"]].click()
+            # cumulative cost equation: {\displaystyle {\text{Cumulative price}}={\frac {{\text{Base cost}}\times (1.15^{N}-1)}{0.15}}}
+            can_afford = math.floor(
+                math.log((balance * 0.15 / best["price"]) + 1, 1.15)
+            )
+            final_owned = best["owned"] + can_afford
+            for _ in range(can_afford):
+                products[best["index"]].click()
             # update current values after purchase
             self.__update_product_record(best)
-            await asyncio.sleep(60)
-
-    async def check_upgrades(self):
-        while True:
-            try:
-                upgrades = self.__get_upgrade_list()
-                cheapest_upgrade = upgrades[0]
-                metadata = self.get_upgrade_metadata(cheapest_upgrade)
-                if "enabled" in metadata["classes"]:
-                    self.logger.info(f"Buying cheapest upgrade")
-                    cheapest_upgrade.click()
-                    self.logger.info("Updating all product values")
-                    _ = self.update_all_products(iterative=False)
-            except StaleElementReferenceException:
-                self.logger.warning("Upgrade failed.")
-
-            await asyncio.sleep(60)
+            existing_purchase = (
+                best["value"] > self.current_values[best["name"]]["value"]
+            )
+            new_purchase = best["owned"] == 0
+            if (existing_purchase or new_purchase) and can_afford:
+                plural = "s" if can_afford > 1 else ""
+                self.logger.info(
+                    f"Bought {can_afford} {best['name']}{plural} ({final_owned} now owned) with initial value of {best['value']:.3E} CpS per C"
+                )
+            self.__hide_tooltip()
+            await asyncio.sleep(self.check_purchase_sleep_seconds)
 
     def __get_product_list(self):
         return selector.find_element(
@@ -146,6 +167,12 @@ class CookieClicker:
             wait=0,
             ignore_timeout=True,
         )
+
+    def __get_balance(self) -> float:
+        balance_text = selector.find_element(
+            "id", "cookies", self.chrome_browser.driver, "located"
+        ).text
+        return self.text2float(balance_text.split("\n")[0])
 
     def __get_upgrade_list(self):
         return selector.find_element(
@@ -162,6 +189,9 @@ class CookieClicker:
             f"Game.tooltip.dynamic=1;Game.tooltip.draw(this,function(){{return Game.ObjectsById[{index}].tooltip();}},'store');Game.tooltip.wobble();"
         )
 
+    def __hide_tooltip(self):
+        self.chrome_browser.driver.execute_script("Game.tooltip.shouldHide=1;")
+
     def __update_product_record(self, metadata):
         self.__update_tooltip(metadata["index"])
         data = self.get_product_data()
@@ -172,8 +202,7 @@ class CookieClicker:
         loop = asyncio.get_event_loop()
         loop.create_task(self.click_forever(self.big_cookie))
         loop.create_task(self.click_golden_cookie())
-        loop.create_task(self.check_products())
-        loop.create_task(self.check_upgrades())
+        loop.create_task(self.check_purchases())
         loop.run_forever()
 
     def text2float(self, text: str):
