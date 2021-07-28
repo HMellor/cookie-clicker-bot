@@ -14,6 +14,8 @@ from selenium.common.exceptions import (
 
 class CookieClicker:
     golden_cookie_sleep_seconds = 1
+    big_cookie_sleep_seconds = 0
+    check_purchase_sleep_seconds = 60
 
     def __init__(self):
         self.current_values = {}
@@ -80,7 +82,7 @@ class CookieClicker:
                 self.logger.error(e.msg.replace("\n", " ").strip())
                 self.logger.warning("Golden cookie blocking big cookie")
                 asyncio.sleep(self.golden_cookie_sleep_seconds)
-            await asyncio.sleep(0)
+            await asyncio.sleep(self.big_cookie_sleep_seconds)
 
     async def click_golden_cookie(self):
         while True:
@@ -153,7 +155,7 @@ class CookieClicker:
                 self.logger.info(
                     f"Bought {can_afford} {best['name']}{plural} ({final_owned} now owned) with initial value of {best['value']:.3E} CpS per C"
                 )
-            await asyncio.sleep(60)
+            await asyncio.sleep(self.check_purchase_sleep_seconds)
 
     def __get_product_list(self):
         return selector.find_element(
