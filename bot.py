@@ -98,8 +98,16 @@ class CookieClicker:
                 self.logger.error(e.msg.replace("\n", " ").strip())
                 self.logger.warning("Golden cookie failed, it was likely under the tooltip")
 
-    async def check_products(self):
+    async def check_purchases(self):
         while True:
+            upgrades = self.__get_upgrade_list()
+            cheapest_upgrade = upgrades[0]
+            metadata = self.get_upgrade_metadata(cheapest_upgrade)
+            if "enabled" in metadata["classes"]:
+                self.logger.info("Buying cheapest upgrade and updating all product values")
+                cheapest_upgrade.click()
+                _ = self.update_all_products(iterative=False)
+
             products = self.update_all_products(iterative=True)
             # find most cost effective option
             current_values = self.current_values.items()
@@ -125,22 +133,13 @@ class CookieClicker:
                 products[best["index"]].click()
             # update current values after purchase
             self.__update_product_record(best)
-            await asyncio.sleep(60)
-
-    async def check_upgrades(self):
-        while True:
-            try:
-                upgrades = self.__get_upgrade_list()
-                cheapest_upgrade = upgrades[0]
-                metadata = self.get_upgrade_metadata(cheapest_upgrade)
-                if "enabled" in metadata["classes"]:
-                    self.logger.info(f"Buying cheapest upgrade")
-                    cheapest_upgrade.click()
-                    self.logger.info("Updating all product values")
-                    _ = self.update_all_products(iterative=False)
-            except StaleElementReferenceException:
-                self.logger.warning("Upgrade failed.")
-
+            existing_purchased = best["value"] > self.current_values[best["name"]]["value"]
+            new_purchased = best["value"] == 0 and can_afford
+            if existing_purchased or new_purchased:
+                plural = "s" if can_afford > 1 else ""
+                self.logger.info(
+                    f"Bought {can_afford} {best['name']}{plural} ({final_owned} now owned) with initial value of {best['value']:.3E} CpS per C"
+                )
             await asyncio.sleep(60)
 
     def __get_product_list(self):
@@ -184,8 +183,7 @@ class CookieClicker:
         loop = asyncio.get_event_loop()
         loop.create_task(self.click_forever(self.big_cookie))
         loop.create_task(self.click_golden_cookie())
-        loop.create_task(self.check_products())
-        loop.create_task(self.check_upgrades())
+        loop.create_task(self.check_purchases())
         loop.run_forever()
 
     def text2float(self, text: str):
