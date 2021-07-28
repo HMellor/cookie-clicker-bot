@@ -155,6 +155,7 @@ class CookieClicker:
                 self.logger.info(
                     f"Bought {can_afford} {best['name']}{plural} ({final_owned} now owned) with initial value of {best['value']:.3E} CpS per C"
                 )
+            self.__hide_tooltip()
             await asyncio.sleep(self.check_purchase_sleep_seconds)
 
     def __get_product_list(self):
@@ -187,6 +188,9 @@ class CookieClicker:
         self.chrome_browser.driver.execute_script(
             f"Game.tooltip.dynamic=1;Game.tooltip.draw(this,function(){{return Game.ObjectsById[{index}].tooltip();}},'store');Game.tooltip.wobble();"
         )
+
+    def __hide_tooltip(self):
+        self.chrome_browser.driver.execute_script("Game.tooltip.shouldHide=1;")
 
     def __update_product_record(self, metadata):
         self.__update_tooltip(metadata["index"])
