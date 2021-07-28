@@ -1,4 +1,5 @@
 import os
+import math
 import asyncio
 import logging
 import logging.handlers
@@ -113,7 +114,15 @@ class CookieClicker:
                 self.logger.info(
                     f"Going for new building: {best['name']}, {100*balance/best['price']:.2f}% complete"
                 )
-            products[best["index"]].click()
+            # calculate lower bound for base cost (doesn't account for free buildings)
+            base_cost = best["price"] / (1.15 ** best["owned"])
+            # cumulative cost equation: {\displaystyle {\text{Cumulative price}}={\frac {{\text{Base cost}}\times (1.15^{b}-1.15^{a})}{0.15}}}
+            final_owned = math.floor(
+                math.log((balance * 0.15 / base_cost) + (1.15 ** best["owned"]), 1.15)
+            )
+            can_afford = final_owned - best["owned"]
+            for _ in range(can_afford):
+                products[best["index"]].click()
             # update current values after purchase
             self.__update_product_record(best)
             await asyncio.sleep(60)
