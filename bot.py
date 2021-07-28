@@ -114,7 +114,9 @@ class CookieClicker:
             cheapest_upgrade = upgrades[0]
             metadata = self.get_upgrade_metadata(cheapest_upgrade)
             if "enabled" in metadata["classes"]:
-                self.logger.info("Buying cheapest upgrade and updating all product values")
+                self.logger.info(
+                    "Buying cheapest upgrade and updating all product values"
+                )
                 cheapest_upgrade.click()
                 _ = self.update_all_products(iterative=False)
 
@@ -133,20 +135,20 @@ class CookieClicker:
                 self.logger.info(
                     f"Going for new building: {best['name']}, {100*balance/best['price']:.2f}% complete"
                 )
-            # calculate lower bound for base cost (doesn't account for free buildings)
-            base_cost = best["price"] / (1.15 ** best["owned"])
-            # cumulative cost equation: {\displaystyle {\text{Cumulative price}}={\frac {{\text{Base cost}}\times (1.15^{b}-1.15^{a})}{0.15}}}
-            final_owned = math.floor(
-                math.log((balance * 0.15 / base_cost) + (1.15 ** best["owned"]), 1.15)
+            # cumulative cost equation: {\displaystyle {\text{Cumulative price}}={\frac {{\text{Base cost}}\times (1.15^{N}-1)}{0.15}}}
+            can_afford = math.floor(
+                math.log((balance * 0.15 / best["price"]) + 1, 1.15)
             )
-            can_afford = final_owned - best["owned"]
+            final_owned = best["owned"] + can_afford
             for _ in range(can_afford):
                 products[best["index"]].click()
             # update current values after purchase
             self.__update_product_record(best)
-            existing_purchased = best["value"] > self.current_values[best["name"]]["value"]
-            new_purchased = best["value"] == 0 and can_afford
-            if existing_purchased or new_purchased:
+            existing_purchase = (
+                best["value"] > self.current_values[best["name"]]["value"]
+            )
+            new_purchase = best["owned"] == 0
+            if (existing_purchase or new_purchase) and can_afford:
                 plural = "s" if can_afford > 1 else ""
                 self.logger.info(
                     f"Bought {can_afford} {best['name']}{plural} ({final_owned} now owned) with initial value of {best['value']:.3E} CpS per C"
