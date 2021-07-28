@@ -101,17 +101,17 @@ class CookieClicker:
         while True:
             products = self.update_all_products(iterative=True)
             # find most cost effective option
-            sorted_values = sorted(
-                self.current_values.items(), key=lambda i: i[1]["value"], reverse=True
-            )
-            none_owned = [v for v in sorted_values if v[1]["owned"] == 0]
-            best = sorted_values[0][1]
-            if len(none_owned) and none_owned[0][1]["price"] < best["price"] * 3:
-                best = none_owned[0][1]
-                self.logger.info(f"Going for new building: {best['name']}")
-            else:
+            current_values = self.current_values.items()
+            none_owned = [v for v in current_values if v[1]["owned"] == 0]
+            # extract salient products
+            best = max(current_values, key=lambda i: i[1]["value"])[1]
+            cheapest_none_owned = min(none_owned, key=lambda i: i[1]["price"])[1]
+            # if we have enough cookies to work towards the next building, do it
+            balance = self.__get_balance()
+            if len(none_owned) and cheapest_none_owned["price"] < balance * 3:
+                best = cheapest_none_owned
                 self.logger.info(
-                    f"Current best value: {best['name']}, {best['value']:.3E} CpS per C"
+                    f"Going for new building: {best['name']}, {100*balance/best['price']:.2f}% complete"
                 )
             products[best["index"]].click()
             # update current values after purchase
@@ -143,6 +143,12 @@ class CookieClicker:
             wait=0,
             ignore_timeout=True,
         )
+
+    def __get_balance(self) -> float:
+        balance_text = selector.find_element(
+            "id", "cookies", self.chrome_browser.driver, "located"
+        ).text
+        return self.text2float(balance_text.split("\n")[0])
 
     def __get_upgrade_list(self):
         return selector.find_element(
