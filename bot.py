@@ -121,7 +121,11 @@ class CookieClicker:
                     wait=0,
                     ignore_timeout=True,
                 )
-                if golden_cookie is not None:
+                # check that golden cookie is not negative (ruin)
+                if (
+                    golden_cookie
+                    and golden_cookie.get_attribute("alt") == "Golden cookie"
+                ):
                     golden_cookie.click()
                     self.logger.info("Got the golden cookie!")
             except (
