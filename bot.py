@@ -193,8 +193,7 @@ class CookieClicker:
         self.chrome_browser.driver.execute_script("Game.tooltip.shouldHide=1;")
 
     def __update_product_record(self, metadata):
-        self.__update_tooltip(metadata["index"])
-        data = self.get_product_data()
+        data = self.get_product_data(metadata["index"])
         product_record = {metadata["name"]: {**metadata, **data}}
         self.current_values.update(product_record)
 
@@ -227,8 +226,9 @@ class CookieClicker:
         elif n == 2:
             return float(parts[0]) * mapping[parts[1]]
 
-    def get_product_data(self):
+    def get_product_data(self, index):
         try:
+            self.__update_tooltip(index)
             tooltip = selector.find_element(
                 "id", "tooltip", self.chrome_browser.driver, "located"
             )
@@ -263,7 +263,7 @@ class CookieClicker:
             }
             return data
         except (StaleElementReferenceException, AssertionError):
-            return self.get_product_data()
+            return self.get_product_data(index)
 
     def get_product_metadata(self, product):
         product_classes = set(product.get_attribute("class").split(" "))
