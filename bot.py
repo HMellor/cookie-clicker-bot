@@ -103,9 +103,11 @@ class CookieClicker:
             try:
                 elem.click()
             except ElementClickInterceptedException as e:
-                self.logger.error(e.msg.replace("\n", " ").strip())
-                self.logger.warning("Golden cookie blocking big cookie")
-                asyncio.sleep(self.golden_cookie_sleep_seconds)
+                self.logger.error(
+                    "Golden cookie blocking big cookie: "
+                    + e.msg.replace("\n", " ").strip()
+                )
+                await asyncio.sleep(self.golden_cookie_sleep_seconds)
             await asyncio.sleep(self.big_cookie_sleep_seconds)
 
     async def click_golden_cookie(self):
@@ -122,16 +124,14 @@ class CookieClicker:
                 if golden_cookie is not None:
                     golden_cookie.click()
                     self.logger.info("Got the golden cookie!")
-            except ElementNotInteractableException as e:
-                # refresh the golden cookie container
-                self.logger.error(e.msg.replace("\n", " ").strip())
-                self.logger.warning("Golden cookie failed")
-            except ElementClickInterceptedException as e:
-                self.logger.error(e.msg.replace("\n", " ").strip())
-                self.logger.warning("Golden cookie failed, hidden under tooltip")
-            except StaleElementReferenceException as e:
-                self.logger.error(e.msg.replace("\n", " ").strip())
-                self.logger.warning("Golden cookie failed")
+            except (
+                ElementNotInteractableException,
+                ElementClickInterceptedException,
+                StaleElementReferenceException,
+            ) as e:
+                self.logger.error(
+                    "Golden cookie failed: " + e.msg.replace("\n", " ").strip()
+                )
             await asyncio.sleep(self.golden_cookie_sleep_seconds)
 
     async def check_purchases(self):
