@@ -16,6 +16,7 @@ class CookieClicker:
     golden_cookie_sleep_seconds = 1
     big_cookie_sleep_seconds = 0
     check_purchase_sleep_seconds = 60
+    wrinkler_sleep_seconds = 5
     mapping = {
         "cookies": 1,
         "thousand": 10 ** 3,
@@ -138,6 +139,11 @@ class CookieClicker:
                 )
             await asyncio.sleep(self.golden_cookie_sleep_seconds)
 
+    async def pop_wrinkler(self):
+        while True:
+            self.__pop_wrinkler()
+            await asyncio.sleep(self.wrinkler_sleep_seconds)
+
     async def check_purchases(self):
         while True:
             upgrades = self.__get_upgrade_list()
@@ -220,6 +226,9 @@ class CookieClicker:
     def __hide_tooltip(self):
         self.chrome_browser.driver.execute_script("Game.tooltip.shouldHide=1;")
 
+    def __pop_wrinkler(self):
+        self.chrome_browser.driver.execute_script("Game.PopRandomWrinkler();")
+
     def __update_product_record(self, metadata):
         data = self.get_product_data(metadata["index"])
         product_record = {metadata["name"]: {**metadata, **data}}
@@ -229,6 +238,7 @@ class CookieClicker:
         loop = asyncio.get_event_loop()
         loop.create_task(self.click_forever(self.big_cookie))
         loop.create_task(self.click_golden_cookie())
+        loop.create_task(self.pop_wrinkler())
         loop.create_task(self.check_purchases())
         loop.run_forever()
 
