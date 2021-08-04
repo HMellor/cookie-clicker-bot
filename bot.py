@@ -247,19 +247,20 @@ class CookieClicker:
             tooltip = selector.find_element(
                 "id", "tooltip", self.chrome_browser.driver, "located"
             )
-            price_text = selector.find_element(
-                "class", "price", tooltip, "located"
-            ).text
-            owned_text = selector.find_element("tag", "small", tooltip, "located").text
-            stats_elems = selector.find_element(
-                "css", ".data > b", tooltip, "all_located", ignore_timeout=True
-            )
+            price = selector.find_element("class", "price", tooltip, "located")
+            owned = selector.find_element("tag", "small", tooltip, "located")
+            assert bool(price) and bool(owned)
+            price_text = price.text
+            owned_text = owned.text
             assert bool(price_text) and bool(owned_text)
             price = self.text2float(price_text)
             owned = int(owned_text.split(" ")[-1])
             value = 0
             cps = 0
             if owned > 0:
+                stats_elems = selector.find_element(
+                    "css", ".data > b", tooltip, "all_located", ignore_timeout=True
+                )
                 stats_text = [i.text for i in stats_elems]
                 assert all([bool(i) for i in stats_text])
                 stats = [self.text2float(e) for e in stats_text]
