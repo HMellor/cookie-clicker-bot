@@ -16,6 +16,30 @@ class CookieClicker:
     golden_cookie_sleep_seconds = 1
     big_cookie_sleep_seconds = 0
     check_purchase_sleep_seconds = 60
+    mapping = {
+        "cookies": 1,
+        "thousand": 10 ** 3,
+        "million": 10 ** 6,
+        "billion": 10 ** 9,
+        "trillion": 10 ** 12,
+        "quadrillion": 10 ** 15,
+        "quintillion": 10 ** 18,
+        "sextillion": 10 ** 21,
+        "septillion": 10 ** 24,
+        "octillion": 10 ** 27,
+        "nonillion": 10 ** 30,
+        "decillion": 10 ** 33,
+        "undecillion": 10 ** 36,
+        "duodecillion": 10 ** 39,
+        "tredecillion": 10 ** 42,
+        "quattuordecillion": 10 ** 45,
+        "quindecillion": 10 ** 48,
+        "sexdecillion": 10 ** 51,
+        "septendecillion": 10 ** 54,
+        "octodecillion": 10 ** 57,
+        "novemdecillion": 10 ** 60,
+        "vigintillion": 10 ** 63,
+    }
 
     def __init__(self):
         self.current_values = {}
@@ -209,22 +233,13 @@ class CookieClicker:
             self.logger.warning("Input string is empty")
             return 0
         parts = text.lower().replace(",", "").split(" ")
-        mapping = {
-            "million": 10 ** 6,
-            "billion": 10 ** 9,
-            "trillion": 10 ** 12,
-            "quadrillion": 10 ** 15,
-            "quintillion": 10 ** 18,
-            "sextillion": 10 ** 21,
-            "septillion": 10 ** 24,
-        }
         if parts[0][-1] == "%":
             return float(parts[0][:-1]) / 100
         n = len(parts)
         if n == 1:
             return float(parts[0])
         elif n == 2:
-            return float(parts[0]) * mapping[parts[1]]
+            return float(parts[0]) * self.mapping[parts[1]]
 
     def get_product_data(self, index):
         try:
