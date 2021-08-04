@@ -146,51 +146,63 @@ class CookieClicker:
 
     async def check_purchases(self):
         while True:
-            upgrades = self.__get_upgrade_list()
-            cheapest_upgrade = upgrades[0]
-            metadata = self.get_upgrade_metadata(cheapest_upgrade)
-            if "enabled" in metadata["classes"]:
-                self.logger.info(
-                    "Buying cheapest upgrade and updating all product values"
-                )
-                cheapest_upgrade.click()
-                _ = self.update_all_products(iterative=False)
-
-            products = self.update_all_products(iterative=True)
-            # find most cost effective option
-            current_values = self.current_values.items()
-            none_owned = [v for v in current_values if v[1]["owned"] == 0]
-            # extract salient products
-            best = max(current_values, key=lambda i: i[1]["value"])[1]
-            if len(none_owned):
-                cheapest_none_owned = min(none_owned, key=lambda i: i[1]["price"])[1]
-            # if we have enough cookies to work towards the next building, do it
-            balance = self.__get_balance()
-            if len(none_owned) and cheapest_none_owned["price"] < balance * 3:
-                best = cheapest_none_owned
-                self.logger.info(
-                    f"Going for new building: {best['name']}, {100*balance/best['price']:.2f}% complete"
-                )
-            # cumulative cost equation: {\displaystyle {\text{Cumulative price}}={\frac {{\text{Base cost}}\times (1.15^{N}-1)}{0.15}}}
-            can_afford = math.floor(
-                math.log((balance * 0.15 / best["price"]) + 1, 1.15)
-            )
-            final_owned = best["owned"] + can_afford
-            for _ in range(can_afford):
-                products[best["index"]].click()
-            # update current values after purchase
-            self.__update_product_record(best)
-            existing_purchase = (
-                best["value"] > self.current_values[best["name"]]["value"]
-            )
-            new_purchase = best["owned"] == 0
-            if (existing_purchase or new_purchase) and can_afford:
-                plural = "s" if can_afford > 1 else ""
-                self.logger.info(
-                    f"Bought {can_afford} {best['name']}{plural} ({final_owned} now owned) with initial value of {best['value']:.3E} CpS per C"
-                )
-            self.__hide_tooltip()
+            self.buy_upgrades()
+            self.buy_products()
             await asyncio.sleep(self.check_purchase_sleep_seconds)
+
+    def buy_upgrades(self):
+        upgrades = self.__get_upgrade_list()
+        cheapest_upgrade = upgrades[0]
+        metadata = self.get_upgrade_metadata(cheapest_upgrade)
+        update_products = False
+        if "enabled" in metadata["classes"]:
+            self.logger.info("Buying cheapest upgrade and updating all product values")
+            cheapest_upgrade.click()
+            update_products = True
+
+        buy_all_btn_present = selector.find_element(
+            "id",
+            "storeBuyAllButton",
+            self.upgrades_container,
+            "located",
+            wait=0,
+            ignore_timeout=True,
+        )
+        if buy_all_btn_present:
+            self.__buy_all_upgrades()
+        if update_products:
+            _ = self.update_all_products(iterative=False)
+
+    def buy_products(self):
+        products = self.update_all_products(iterative=True)
+        # find most cost effective option
+        current_values = self.current_values.items()
+        none_owned = [v for v in current_values if v[1]["owned"] == 0]
+        # extract salient products
+        best = max(current_values, key=lambda i: i[1]["value"])[1]
+        if len(none_owned):
+            cheapest_none_owned = min(none_owned, key=lambda i: i[1]["price"])[1]
+        # if we have enough cookies to work towards the next building, do it
+        balance = self.__get_balance()
+        if len(none_owned) and cheapest_none_owned["price"] < balance * 3:
+            best = cheapest_none_owned
+            self.logger.info(
+                f"Going for new building: {best['name']}, {100*balance/best['price']:.2f}% complete"
+            )
+        # cumulative cost equation: {\displaystyle {\text{Cumulative price}}={\frac {{\text{Base cost}}\times (1.15^{N}-1)}{0.15}}}
+        can_afford = math.floor(math.log((balance * 0.15 / best["price"]) + 1, 1.15))
+        final_owned = best["owned"] + can_afford
+        for _ in range(can_afford):
+            products[best["index"]].click()
+        # update current values after purchase
+        self.__update_product_record(best)
+        existing_purchase = best["value"] > self.current_values[best["name"]]["value"]
+        new_purchase = best["owned"] == 0
+        if (existing_purchase or new_purchase) and can_afford:
+            plural = "s" if can_afford > 1 else ""
+            self.logger.info(
+                f"Bought {can_afford} {best['name']}{plural} ({final_owned} now owned) with initial value of {best['value']:.3E} CpS per C"
+            )
 
     def __get_product_list(self):
         return selector.find_element(
@@ -228,6 +240,9 @@ class CookieClicker:
 
     def __pop_wrinkler(self):
         self.chrome_browser.driver.execute_script("Game.PopRandomWrinkler();")
+
+    def __buy_all_upgrades(self):
+        self.chrome_browser.driver.execute_script("Game.storeBuyAll();")
 
     def __update_product_record(self, metadata):
         data = self.get_product_data(metadata["index"])
@@ -291,6 +306,7 @@ class CookieClicker:
                 "owned": owned,
                 "cps": cps,
             }
+            self.__hide_tooltip()
             return data
         except (StaleElementReferenceException, AssertionError):
             return self.get_product_data(index)
