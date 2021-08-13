@@ -72,11 +72,33 @@ def configure_logger(name):
     return logger
 
 
+class AsyncRunner:
+    def __init__(self, tasks):
+        self.logger = logging.getLogger("bot.AsyncRunner")
+        self.tasks = tasks
+
+    async def loop_forever(self, funcs, delay):
+        while True:
+            try:
+                for f in funcs:
+                    f()
+                await asyncio.sleep(delay)
+            except Exception as e:
+                self.logger.error(e.msg.replace("\n", " "))
+
+    def start(self):
+        loop = asyncio.get_event_loop()
+        for funcs, delay in self.tasks:
+            loop.create_task(self.loop_forever(funcs, delay))
+        loop.run_forever()
+
+
 class CookieClicker:
-    golden_cookie_sleep_seconds = 1
-    big_cookie_sleep_seconds = 0
-    check_purchase_sleep_seconds = 60
-    wrinkler_sleep_seconds = 5
+    # Sleep times in seconds
+    golden_cookie_sleep = 1
+    big_cookie_sleep = 0
+    check_buy_sleep = 60
+    extras_sleep = 5
 
     def __init__(self):
         self.current_values = {}
@@ -95,6 +117,14 @@ class CookieClicker:
         self.products_container = selector.find_element(
             "id", "products", self.chrome_browser.driver, "located"
         )
+        tasks = [
+            ([self.click_big_cookie], self.big_cookie_sleep),
+            ([self.click_golden_cookie], self.golden_cookie_sleep),
+            ([self.pop_wrinkler, self.click_fortune], self.extras_sleep),
+            ([self.buy_upgrades, self.buy_products], self.check_buy_sleep),
+        ]
+        async_runner = AsyncRunner(tasks)
+        async_runner.start()
 
     def __del__(self):
         self.chrome_browser.close()
@@ -113,65 +143,28 @@ class CookieClicker:
         )
         return chrome_browser
 
-    # Asynchronous runners
-    async def click_forever(self, elem):
-        while True:
-            try:
-                elem.click()
-            except ElementClickInterceptedException as e:
-                self.logger.error(
-                    "Golden cookie blocking big cookie: "
-                    + e.msg.replace("\n", " ").strip()
-                )
-                await asyncio.sleep(self.golden_cookie_sleep_seconds)
-            await asyncio.sleep(self.big_cookie_sleep_seconds)
+    def click_big_cookie(self):
+        try:
+            self.big_cookie.click()
+        except ElementClickInterceptedException as e:
+            self.log_error("Golden cookie blocking big cookie", e)
+            # await asyncio.sleep(self.golden_cookie_sleep)
 
-    async def click_golden_cookie(self):
-        while True:
-            try:
-                golden_cookie = selector.find_element(
-                    "class",
-                    "shimmer",
-                    self.golden_cookie_container,
-                    "located",
-                    wait=0,
-                    ignore_timeout=True,
-                )
-                # check that golden cookie is not negative (ruin)
-                if (
-                    golden_cookie
-                    and golden_cookie.get_attribute("alt") == "Golden cookie"
-                ):
+    def click_golden_cookie(self):
+        try:
+            golden_cookie = self.__get_golden_cookie()
+            # check that golden cookie is not negative
+            if golden_cookie:
+                golden_cookie_type = golden_cookie.get_attribute("alt")
+                if golden_cookie_type != "Wrath cookie":
                     golden_cookie.click()
-                    self.logger.info("Got the golden cookie!")
-            except (
-                ElementNotInteractableException,
-                ElementClickInterceptedException,
-                StaleElementReferenceException,
-            ) as e:
-                self.logger.error(
-                    "Golden cookie failed: " + e.msg.replace("\n", " ").strip()
-                )
-            await asyncio.sleep(self.golden_cookie_sleep_seconds)
-
-    async def pop_wrinkler(self):
-        while True:
-            self.__pop_wrinkler()
-            await asyncio.sleep(self.wrinkler_sleep_seconds)
-
-    async def check_purchases(self):
-        while True:
-            self.buy_upgrades()
-            self.buy_products()
-            await asyncio.sleep(self.check_purchase_sleep_seconds)
-
-    def start(self):
-        loop = asyncio.get_event_loop()
-        loop.create_task(self.click_forever(self.big_cookie))
-        loop.create_task(self.click_golden_cookie())
-        loop.create_task(self.check_extras())
-        loop.create_task(self.check_purchases())
-        loop.run_forever()
+                    self.logger.info(f"Got the {golden_cookie_type.lower()}!")
+        except (
+            ElementNotInteractableException,
+            ElementClickInterceptedException,
+            StaleElementReferenceException,
+        ) as e:
+            self.log_error("Golden cookie failed", e)
 
     def buy_upgrades(self):
         upgrades = self.__get_upgrade_list()
