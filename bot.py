@@ -172,21 +172,16 @@ class CookieClicker:
         metadata = self.get_upgrade_metadata(cheapest_upgrade)
         update_products = False
         if "enabled" in metadata["classes"]:
-            self.logger.info("Buying cheapest upgrade and updating all product values")
+            self.logger.info("Buying cheapest upgrade")
             cheapest_upgrade.click()
             update_products = True
 
-        buy_all_btn_present = selector.find_element(
-            "id",
-            "storeBuyAllButton",
-            self.upgrades_container,
-            "located",
-            wait=0,
-            ignore_timeout=True,
-        )
+        buy_all_btn_present = self.__get_buy_all_button()
         if buy_all_btn_present:
+            self.logger.info("Buying all remaining upgrades")
             self.__buy_all_upgrades()
         if update_products:
+            self.logger.info("Updating all product values")
             _ = self.update_all_products(iterative=False)
 
     def buy_products(self):
@@ -220,6 +215,7 @@ class CookieClicker:
                 f"Bought {can_afford} {best['name']}{plural} ({final_owned} now owned) with initial value of {best['value']:.3E} CpS per C"
             )
 
+    # Getters
     def __get_product_list(self):
         return selector.find_element(
             "class",
@@ -229,12 +225,6 @@ class CookieClicker:
             wait=0,
             ignore_timeout=True,
         )
-
-    def __get_balance(self) -> float:
-        balance_text = selector.find_element(
-            "id", "cookies", self.chrome_browser.driver, "located"
-        ).text
-        return text2float(balance_text.split("\n")[0])
 
     def __get_upgrade_list(self):
         return selector.find_element(
@@ -246,10 +236,31 @@ class CookieClicker:
             ignore_timeout=True,
         )
 
-    def __update_tooltip(self, index):
-        self.chrome_browser.driver.execute_script(
-            f"Game.tooltip.dynamic=1;Game.tooltip.draw(this,function(){{return Game.ObjectsById[{index}].tooltip();}},'store');Game.tooltip.wobble();"
+    def __get_golden_cookie(self):
+        return selector.find_element(
+            "class",
+            "shimmer",
+            self.golden_cookie_container,
+            "located",
+            wait=0,
+            ignore_timeout=True,
         )
+
+    def __get_buy_all_button(self):
+        return selector.find_element(
+            "id",
+            "storeBuyAllButton",
+            self.upgrades_container,
+            "located",
+            wait=0,
+            ignore_timeout=True,
+        )
+
+    def __get_balance(self) -> float:
+        balance_text = selector.find_element(
+            "id", "cookies", self.chrome_browser.driver, "located"
+        ).text
+        return text2float(balance_text.split("\n")[0])
 
     def __hide_tooltip(self):
         self.chrome_browser.driver.execute_script("Game.tooltip.shouldHide=1;")
