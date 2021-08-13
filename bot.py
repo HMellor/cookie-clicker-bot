@@ -367,6 +367,7 @@ class CookieClicker:
 
 
 if __name__ == "__main__":
+    logger = configure_logger("bot")
     cookie_clicker = CookieClicker()
     try:
         cookie_clicker.start()
