@@ -73,9 +73,11 @@ def configure_logger(name):
 
 
 class AsyncRunner:
-    def __init__(self, tasks):
+    def __init__(self, tasks, immediate_start=False):
         self.logger = logging.getLogger("bot.AsyncRunner")
         self.tasks = tasks
+        if immediate_start:
+            self.start()
 
     async def loop_forever(self, funcs, delay):
         while True:
@@ -123,8 +125,7 @@ class CookieClicker:
             ([self.pop_wrinkler, self.click_fortune], self.extras_sleep),
             ([self.buy_upgrades, self.buy_products], self.check_buy_sleep),
         ]
-        async_runner = AsyncRunner(tasks)
-        async_runner.start()
+        async_runner = AsyncRunner(tasks, immediate_start=True)
 
     def __del__(self):
         self.chrome_browser.close()
