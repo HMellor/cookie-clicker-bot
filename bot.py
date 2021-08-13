@@ -11,40 +11,76 @@ from selenium.common.exceptions import (
     ElementClickInterceptedException,
 )
 
+mapping = {
+    "cookies": 1,
+    "thousand": 1e3,
+    "million": 1e6,
+    "billion": 1e9,
+    "trillion": 1e12,
+    "quadrillion": 1e15,
+    "quintillion": 1e18,
+    "sextillion": 1e21,
+    "septillion": 1e24,
+    "octillion": 1e27,
+    "nonillion": 1e30,
+    "decillion": 1e33,
+    "undecillion": 1e36,
+    "duodecillion": 1e39,
+    "tredecillion": 1e42,
+    "quattuordecillion": 1e45,
+    "quindecillion": 1e48,
+    "sexdecillion": 1e51,
+    "septendecillion": 1e54,
+    "octodecillion": 1e57,
+    "novemdecillion": 1e60,
+    "vigintillion": 1e63,
+}
+
+
+def text2float(text: str) -> float:
+    if not len(text):
+        logger.warning("Input string is empty")
+        return 0
+    parts = text.lower().replace(",", "").split(" ")
+    if parts[0][-1] == "%":
+        return float(parts[0][:-1]) / 100
+    n = len(parts)
+    if n == 1:
+        return float(parts[0])
+    elif n == 2:
+        return float(parts[0]) * mapping[parts[1]]
+
+
+def configure_logger(name):
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.INFO)
+    ch = logging.StreamHandler()
+    log_dir = Path(__file__).parent / "logs"
+    if not log_dir.exists():
+        os.mkdir(log_dir)
+    log_path = log_dir / "bot.log"
+    fh = logging.handlers.RotatingFileHandler(log_path, maxBytes=1000000, backupCount=5)
+    ch.setLevel(logging.INFO)
+    fh.setLevel(logging.INFO)
+    formatter = logging.Formatter(
+        "%(asctime)s | %(name)s | %(levelname)s | %(message)s"
+    )
+    ch.setFormatter(formatter)
+    fh.setFormatter(formatter)
+    logger.addHandler(ch)
+    logger.addHandler(fh)
+    return logger
+
 
 class CookieClicker:
     golden_cookie_sleep_seconds = 1
     big_cookie_sleep_seconds = 0
     check_purchase_sleep_seconds = 60
     wrinkler_sleep_seconds = 5
-    mapping = {
-        "cookies": 1,
-        "thousand": 10 ** 3,
-        "million": 10 ** 6,
-        "billion": 10 ** 9,
-        "trillion": 10 ** 12,
-        "quadrillion": 10 ** 15,
-        "quintillion": 10 ** 18,
-        "sextillion": 10 ** 21,
-        "septillion": 10 ** 24,
-        "octillion": 10 ** 27,
-        "nonillion": 10 ** 30,
-        "decillion": 10 ** 33,
-        "undecillion": 10 ** 36,
-        "duodecillion": 10 ** 39,
-        "tredecillion": 10 ** 42,
-        "quattuordecillion": 10 ** 45,
-        "quindecillion": 10 ** 48,
-        "sexdecillion": 10 ** 51,
-        "septendecillion": 10 ** 54,
-        "octodecillion": 10 ** 57,
-        "novemdecillion": 10 ** 60,
-        "vigintillion": 10 ** 63,
-    }
 
     def __init__(self):
         self.current_values = {}
-        self.logger = self.configure_logger()
+        self.logger = logging.getLogger("bot.CookieClicker")
         self.chrome_browser = self.open_browser()
         self.chrome_browser.navigate_to("https://orteil.dashnet.org/cookieclicker/")
         self.big_cookie = selector.find_element(
@@ -77,28 +113,7 @@ class CookieClicker:
         )
         return chrome_browser
 
-    def configure_logger(self):
-        logger = logging.getLogger("cookie_clicker_bot")
-        logger.setLevel(logging.INFO)
-        ch = logging.StreamHandler()
-        log_dir = Path(__file__).parent / "logs"
-        if not log_dir.exists():
-            os.mkdir(log_dir)
-        log_path = log_dir / "bot.log"
-        fh = logging.handlers.RotatingFileHandler(
-            log_path, maxBytes=1000000, backupCount=5
-        )
-        ch.setLevel(logging.INFO)
-        fh.setLevel(logging.INFO)
-        formatter = logging.Formatter(
-            "%(asctime)s | %(name)s | %(levelname)s | %(message)s"
-        )
-        ch.setFormatter(formatter)
-        fh.setFormatter(formatter)
-        logger.addHandler(ch)
-        logger.addHandler(fh)
-        return logger
-
+    # Asynchronous runners
     async def click_forever(self, elem):
         while True:
             try:
@@ -149,6 +164,14 @@ class CookieClicker:
             self.buy_upgrades()
             self.buy_products()
             await asyncio.sleep(self.check_purchase_sleep_seconds)
+
+    def start(self):
+        loop = asyncio.get_event_loop()
+        loop.create_task(self.click_forever(self.big_cookie))
+        loop.create_task(self.click_golden_cookie())
+        loop.create_task(self.check_extras())
+        loop.create_task(self.check_purchases())
+        loop.run_forever()
 
     def buy_upgrades(self):
         upgrades = self.__get_upgrade_list()
@@ -218,7 +241,7 @@ class CookieClicker:
         balance_text = selector.find_element(
             "id", "cookies", self.chrome_browser.driver, "located"
         ).text
-        return self.text2float(balance_text.split("\n")[0])
+        return text2float(balance_text.split("\n")[0])
 
     def __get_upgrade_list(self):
         return selector.find_element(
@@ -249,27 +272,6 @@ class CookieClicker:
         product_record = {metadata["name"]: {**metadata, **data}}
         self.current_values.update(product_record)
 
-    def start(self):
-        loop = asyncio.get_event_loop()
-        loop.create_task(self.click_forever(self.big_cookie))
-        loop.create_task(self.click_golden_cookie())
-        loop.create_task(self.pop_wrinkler())
-        loop.create_task(self.check_purchases())
-        loop.run_forever()
-
-    def text2float(self, text: str):
-        if not len(text):
-            self.logger.warning("Input string is empty")
-            return 0
-        parts = text.lower().replace(",", "").split(" ")
-        if parts[0][-1] == "%":
-            return float(parts[0][:-1]) / 100
-        n = len(parts)
-        if n == 1:
-            return float(parts[0])
-        elif n == 2:
-            return float(parts[0]) * self.mapping[parts[1]]
-
     def get_product_data(self, index):
         try:
             self.__update_tooltip(index)
@@ -282,7 +284,7 @@ class CookieClicker:
             price_text = price.text
             owned_text = owned.text
             assert bool(price_text) and bool(owned_text)
-            price = self.text2float(price_text)
+            price = text2float(price_text)
             owned = int(owned_text.split(" ")[-1])
             value = 0
             cps = 0
@@ -292,7 +294,7 @@ class CookieClicker:
                 )
                 stats_text = [i.text for i in stats_elems]
                 assert all([bool(i) for i in stats_text])
-                stats = [self.text2float(e) for e in stats_text]
+                stats = [text2float(e) for e in stats_text]
                 if len(stats) == 6:
                     cps = (stats[0]) + ((stats[3]) / owned)
                 elif len(stats) == 4:
