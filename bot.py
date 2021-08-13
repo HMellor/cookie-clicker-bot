@@ -284,6 +284,26 @@ class CookieClicker:
     def __buy_all_upgrades(self):
         self.run_js("Game.storeBuyAll();")
 
+    # Helper functions
+    def log_error(self, msg, exc):
+        exc_msg = exc.msg.replace("\n", " ").strip()
+        self.logger.error(f"{msg}: {exc_msg}")
+
+    def click_fortune(self):
+        fortune = selector.find_element(
+            "class",
+            "fortune",
+            self.chrome_browser.driver,
+            "located",
+            wait=0,
+            ignore_timeout=True,
+        )
+        if fortune:
+            try:
+                fortune.click()
+            except ElementClickInterceptedException as e:
+                self.log_error("Fortune cookie failed", e)
+            self.logger.info("Got fortune cookie!")
 
     def __update_product_record(self, metadata):
         data = self.get_product_data(metadata["index"])
