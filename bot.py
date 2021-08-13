@@ -262,14 +262,28 @@ class CookieClicker:
         ).text
         return text2float(balance_text.split("\n")[0])
 
-    def __hide_tooltip(self):
-        self.chrome_browser.driver.execute_script("Game.tooltip.shouldHide=1;")
+    # Run JS functions
+    def run_js(self, js):
+        self.chrome_browser.driver.execute_script(js)
 
-    def __pop_wrinkler(self):
-        self.chrome_browser.driver.execute_script("Game.PopRandomWrinkler();")
+    def __update_tooltip(self, index, item_type="product"):
+        if item_type == "product":
+            func = f"return Game.ObjectsById[{index}].tooltip();"
+        elif item_type == "upgrade":
+            func = f"return Game.crateTooltip(Game.UpgradesById[{index}],'store');"
+        else:
+            raise ValueError
+        self.run_js(f"Game.tooltip.draw(this,function(){{{func}}},'store');")
+
+    def __hide_tooltip(self):
+        self.run_js("Game.tooltip.shouldHide=1;")
+
+    def pop_wrinkler(self):
+        self.run_js("Game.PopRandomWrinkler();")
 
     def __buy_all_upgrades(self):
-        self.chrome_browser.driver.execute_script("Game.storeBuyAll();")
+        self.run_js("Game.storeBuyAll();")
+
 
     def __update_product_record(self, metadata):
         data = self.get_product_data(metadata["index"])
