@@ -207,34 +207,16 @@ class CookieClicker:
 
     # Getters
     def find_store_items(self, cls):
-        return s.find_element(
-            "class",
-            cls,
-            eval(f"self.{cls}s_container"),
-            "all_located",
-            wait=0,
-            ignore_timeout=True,
-        )
+        args = ("class", cls, eval(f"self.{cls}s_container"), "all_located", 0, True)
+        return s.find_element(*args)
 
     def __get_golden_cookie(self):
-        return s.find_element(
-            "class",
-            "shimmer",
-            self.golden_cookie_container,
-            "located",
-            wait=0,
-            ignore_timeout=True,
-        )
+        args = ("class", "shimmer", self.golden_cookie_container, "located", 0, True)
+        return s.find_element(*args)
 
     def __get_buy_all_button(self):
-        return s.find_element(
-            "id",
-            "storeBuyAllButton",
-            self.upgrades_container,
-            "located",
-            wait=0,
-            ignore_timeout=True,
-        )
+        args = ("id", "storeBuyAllButton", self.upgrades_container, "located", 0, True)
+        return s.find_element(*args)
 
     def __get_balance(self) -> float:
         balance_text = self.find_by_id("cookies").text
@@ -271,14 +253,8 @@ class CookieClicker:
         self.logger.error(f"{msg}: {exc_msg}")
 
     def click_fortune(self):
-        fortune = s.find_element(
-            "class",
-            "fortune",
-            self.browser.driver,
-            "located",
-            wait=0,
-            ignore_timeout=True,
-        )
+        args = ("class", "fortune", self.browser.driver, "located", 0, True)
+        fortune = s.find_element(*args)
         if fortune:
             try:
                 fortune.click()
@@ -337,13 +313,12 @@ class CookieClicker:
         items = self.find_store_items(item_type)
         for item in items:
             data = self.get_item_metadata(item)
-            if "toggledOff" in data["classes"]:
-                continue
-            data.update(self.get_tooltip_data(data["index"], item_type))
-            # update data store
-            is_new = data["name"] not in eval(f"self.{item_type}s")
-            if not iterative or is_new:
-                eval(f"self.{item_type}s").update({data["name"]: data})
+            if "toggledOff" not in data["classes"]:
+                data.update(self.get_tooltip_data(data["index"], item_type))
+                # update stored item data
+                is_new = data["name"] not in eval(f"self.{item_type}s")
+                if not iterative or is_new:
+                    eval(f"self.{item_type}s").update({data["name"]: data})
         return items
 
 
