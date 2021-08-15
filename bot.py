@@ -84,9 +84,9 @@ class AsyncRunner:
             try:
                 for f in funcs:
                     f()
-                await asyncio.sleep(delay)
             except Exception as e:
-                self.logger.error(e.msg.replace("\n", " "))
+                self.logger.exception(e)
+            await asyncio.sleep(delay)
 
     def start(self):
         loop = asyncio.get_event_loop()
