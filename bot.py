@@ -119,7 +119,7 @@ class CookieClicker:
             ([self.pop_wrinkler, self.click_fortune], self.extras_sleep),
             ([self.buy_upgrades, self.buy_products], self.check_buy_sleep),
         ]
-        async_runner = AsyncRunner(tasks, immediate_start=True)
+        self.async_runner = AsyncRunner(tasks, immediate_start=True)
 
     def __del__(self):
         self.browser.close()
