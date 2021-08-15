@@ -104,7 +104,8 @@ class CookieClicker:
     extras_sleep = 5
 
     def __init__(self):
-        self.current_values = {}
+        self.products = {}
+        self.upgrades = {}
         self.logger = logging.getLogger("bot.CookieClicker")
         self.browser = self.open_browser()
         self.browser.navigate_to("https://orteil.dashnet.org/cookieclicker/")
@@ -161,36 +162,32 @@ class CookieClicker:
             self.log_error("Golden cookie failed", e)
 
     def buy_upgrades(self):
-        upgrades = self.__get_upgrade_list()
-        cheapest_upgrade = upgrades[0]
-        metadata = self.get_upgrade_metadata(cheapest_upgrade)
-        update_products = False
-        if "enabled" in metadata["classes"]:
-            self.logger.info("Buying cheapest upgrade")
-            cheapest_upgrade.click()
-            update_products = True
-
-        buy_all_btn_present = self.__get_buy_all_button()
-        if buy_all_btn_present:
-            self.logger.info("Buying all remaining upgrades")
-            self.__buy_all_upgrades()
-        if update_products:
+        upgrades = self.update_all_items("upgrade", iterative=True)
+        affordable = [
+            u[1] for u in self.upgrades.items() if "enabled" in u[1]["classes"]
+        ]
+        if len(affordable) > 0:
+            upgrades[0].click()
+            self.logger.info(f"Bought {affordable[0]['name']}")
+            if len(affordable) > 1:
+                buy_all_btn_present = self.__get_buy_all_button()
+                if buy_all_btn_present:
+                    self.logger.info("Buying all remaining affordable upgrades")
+                    self.__buy_all_upgrades()
             self.logger.info("Updating all product values")
-            _ = self.update_all_products(iterative=False)
+            self.upgrades = {}
+            _ = self.update_all_items("product", iterative=False)
 
     def buy_products(self):
-        products = self.update_all_products(iterative=True)
+        products = self.update_all_items("product", iterative=True)
         # find most cost effective option
-        current_values = self.current_values.items()
-        none_owned = [v for v in current_values if v[1]["owned"] == 0]
+        none_owned = [p[1] for p in self.products.items() if p[1]["owned"] == 0]
         # extract salient products
-        best = max(current_values, key=lambda i: i[1]["value"])[1]
-        if len(none_owned):
-            cheapest_none_owned = min(none_owned, key=lambda i: i[1]["price"])[1]
+        best = max(self.products.items(), key=lambda i: i[1]["value"])[1]
         # if we have enough cookies to work towards the next building, do it
         balance = self.__get_balance()
-        if len(none_owned) and cheapest_none_owned["price"] < balance * 3:
-            best = cheapest_none_owned
+        if len(none_owned) and none_owned[0]["price"] < balance * 3:
+            best = none_owned[0]
             self.logger.info(
                 f"Going for new building: {best['name']}, {100*balance/best['price']:.2f}% complete"
             )
@@ -199,32 +196,21 @@ class CookieClicker:
         final_owned = best["owned"] + can_afford
         for _ in range(can_afford):
             products[best["index"]].click()
-        # update current values after purchase
-        self.__update_product_record(best)
-        existing_purchase = best["value"] > self.current_values[best["name"]]["value"]
-        new_purchase = best["owned"] == 0
-        if (existing_purchase or new_purchase) and can_afford:
+        if can_afford:
+            # update current values after purchase
+            best_data = self.get_tooltip_data(best["index"], "product")
+            self.products[best["name"]].update(best_data)
             plural = "s" if can_afford > 1 else ""
             self.logger.info(
                 f"Bought {can_afford} {best['name']}{plural} ({final_owned} now owned) with initial value of {best['value']:.3E} CpS per C"
             )
 
     # Getters
-    def __get_product_list(self):
+    def find_store_items(self, cls):
         return s.find_element(
             "class",
-            "product",
-            self.products_container,
-            "all_located",
-            wait=0,
-            ignore_timeout=True,
-        )
-
-    def __get_upgrade_list(self):
-        return s.find_element(
-            "class",
-            "upgrade",
-            self.upgrades_container,
+            cls,
+            eval(f"self.{cls}s_container"),
             "all_located",
             wait=0,
             ignore_timeout=True,
@@ -324,53 +310,41 @@ class CookieClicker:
                 else:
                     self.logger.error("Unknown tooltip format.")
                 value = cps / price
-            data = {
-                "price": price,
-                "value": value,
-                "owned": owned,
-                "cps": cps,
-            }
-            self.__hide_tooltip()
+            keys = ["name", "price", "owned", "value", "cps"]
+            data = {}
+            for k in keys:
+                if v := eval(k):
+                    data[k] = v
+            self.__hide_tooltip(item_type)
             return data
         except (StaleElementReferenceException, AssertionError):
-            return self.get_product_data(index)
+            return self.get_tooltip_data(index, item_type)
 
-    def get_product_metadata(self, product):
-        product_classes = set(product.get_attribute("class").split(" "))
-        product_id = product.get_attribute("id")
-        product_idx = int(product_id.replace("product", ""))
-        product_name = s.find_element("class", "title", product, "located").text
-        metadata = {
-            "name": product_name,
-            "classes": product_classes,
-            "index": product_idx,
-        }
+    def get_item_metadata(self, item):
+        classes = set(item.get_attribute("class").split(" "))
+        hover_js = item.get_attribute("onmouseover")
+        index = int(hover_js.split("[")[1].split("]")[0])
+        name = s.find_element("class", "title", item, "located", 0, True)
+        metadata = {"classes": classes, "index": index}
+        if name:
+            metadata["name"] = name.text
         return metadata
 
     def find_by_id(self, id):
         return s.find_element("id", id, self.browser.driver, "located")
 
-    def get_upgrade_metadata(self, upgrade):
-        upgrade_classes = set(upgrade.get_attribute("class").split(" "))
-        upgrade_id = upgrade.get_attribute("id")
-        upgrade_idx = int(upgrade_id.replace("upgrade", ""))
-        metadata = {
-            "classes": upgrade_classes,
-            "index": upgrade_idx,
-        }
-        return metadata
-
-    def update_all_products(self, iterative=False):
-        products = self.__get_product_list()
-        for product in products:
-            metadata = self.get_product_metadata(product)
-            if "toggledOff" in metadata["classes"]:
+    def update_all_items(self, item_type, iterative=False):
+        items = self.find_store_items(item_type)
+        for item in items:
+            data = self.get_item_metadata(item)
+            if "toggledOff" in data["classes"]:
                 continue
-            # update current values
-            is_new = metadata["name"] not in self.current_values
+            data.update(self.get_tooltip_data(data["index"], item_type))
+            # update data store
+            is_new = data["name"] not in eval(f"self.{item_type}s")
             if not iterative or is_new:
-                self.__update_product_record(metadata)
-        return products
+                eval(f"self.{item_type}s").update({data["name"]: data})
+        return items
 
 
 if __name__ == "__main__":
