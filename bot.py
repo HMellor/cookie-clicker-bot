@@ -267,8 +267,11 @@ class CookieClicker:
             raise ValueError
         self.run_js(f"Game.tooltip.draw(this,function(){{{func}}},'store');")
 
-    def __hide_tooltip(self):
-        self.run_js("Game.tooltip.shouldHide=1;")
+    def __hide_tooltip(self, item_type="product"):
+        if item_type == "product":
+            self.run_js("Game.tooltip.shouldHide=1;")
+        elif item_type == "upgrade":
+            self.run_js("Game.setOnCrate(0);Game.tooltip.shouldHide=1;")
 
     def pop_wrinkler(self):
         self.run_js("Game.PopRandomWrinkler();")
