@@ -4,7 +4,8 @@ import asyncio
 import logging
 import logging.handlers
 from pathlib import Path
-from selenium_tools import browser, selector
+from selenium_tools import browser as b
+from selenium_tools import selector as s
 from selenium.common.exceptions import (
     StaleElementReferenceException,
     ElementNotInteractableException,
@@ -105,20 +106,12 @@ class CookieClicker:
     def __init__(self):
         self.current_values = {}
         self.logger = logging.getLogger("bot.CookieClicker")
-        self.chrome_browser = self.open_browser()
-        self.chrome_browser.navigate_to("https://orteil.dashnet.org/cookieclicker/")
-        self.big_cookie = selector.find_element(
-            "id", "bigCookie", self.chrome_browser.driver, "located"
-        )
-        self.golden_cookie_container = selector.find_element(
-            "id", "shimmers", self.chrome_browser.driver, "located"
-        )
-        self.upgrades_container = selector.find_element(
-            "id", "upgrades", self.chrome_browser.driver, "located"
-        )
-        self.products_container = selector.find_element(
-            "id", "products", self.chrome_browser.driver, "located"
-        )
+        self.browser = self.open_browser()
+        self.browser.navigate_to("https://orteil.dashnet.org/cookieclicker/")
+        self.big_cookie = self.find_by_id("bigCookie")
+        self.golden_cookie_container = self.find_by_id("shimmers")
+        self.upgrades_container = self.find_by_id("upgrades")
+        self.products_container = self.find_by_id("products")
         tasks = [
             ([self.click_big_cookie], self.big_cookie_sleep),
             ([self.click_golden_cookie], self.golden_cookie_sleep),
@@ -128,7 +121,7 @@ class CookieClicker:
         async_runner = AsyncRunner(tasks, immediate_start=True)
 
     def __del__(self):
-        self.chrome_browser.close()
+        self.browser.close()
 
     def open_browser(self):
         # create data directory if it doesn't exist
@@ -136,13 +129,13 @@ class CookieClicker:
         if not data_dir.exists():
             os.mkdir(data_dir)
         # instantiate the browser
-        chrome_browser = browser.Browser(
+        browser = b.Browser(
             "chrome",
             headless=False,
             extensions=[Path("extensions/ublock").absolute()],
             user_data_dir="data/cookie_clicker_data",
         )
-        return chrome_browser
+        return browser
 
     def click_big_cookie(self):
         try:
@@ -218,7 +211,7 @@ class CookieClicker:
 
     # Getters
     def __get_product_list(self):
-        return selector.find_element(
+        return s.find_element(
             "class",
             "product",
             self.products_container,
@@ -228,7 +221,7 @@ class CookieClicker:
         )
 
     def __get_upgrade_list(self):
-        return selector.find_element(
+        return s.find_element(
             "class",
             "upgrade",
             self.upgrades_container,
@@ -238,7 +231,7 @@ class CookieClicker:
         )
 
     def __get_golden_cookie(self):
-        return selector.find_element(
+        return s.find_element(
             "class",
             "shimmer",
             self.golden_cookie_container,
@@ -248,7 +241,7 @@ class CookieClicker:
         )
 
     def __get_buy_all_button(self):
-        return selector.find_element(
+        return s.find_element(
             "id",
             "storeBuyAllButton",
             self.upgrades_container,
@@ -258,14 +251,12 @@ class CookieClicker:
         )
 
     def __get_balance(self) -> float:
-        balance_text = selector.find_element(
-            "id", "cookies", self.chrome_browser.driver, "located"
-        ).text
+        balance_text = self.find_by_id("cookies").text
         return text2float(balance_text.split("\n")[0])
 
     # Run JS functions
     def run_js(self, js):
-        self.chrome_browser.driver.execute_script(js)
+        self.browser.driver.execute_script(js)
 
     def __update_tooltip(self, index, item_type="product"):
         if item_type == "product":
@@ -291,10 +282,10 @@ class CookieClicker:
         self.logger.error(f"{msg}: {exc_msg}")
 
     def click_fortune(self):
-        fortune = selector.find_element(
+        fortune = s.find_element(
             "class",
             "fortune",
-            self.chrome_browser.driver,
+            self.browser.driver,
             "located",
             wait=0,
             ignore_timeout=True,
@@ -306,31 +297,20 @@ class CookieClicker:
                 self.log_error("Fortune cookie failed", e)
             self.logger.info("Got fortune cookie!")
 
-    def __update_product_record(self, metadata):
-        data = self.get_product_data(metadata["index"])
-        product_record = {metadata["name"]: {**metadata, **data}}
-        self.current_values.update(product_record)
-
-    def get_product_data(self, index):
+    def get_tooltip_data(self, index, item_type):
+        self.__update_tooltip(index, item_type=item_type)
+        tooltip = s.find_element("id", "tooltip", self.browser.driver, "located")
+        name = s.find_element("class", "name", tooltip, "located")
+        price = s.find_element("class", "price", tooltip, "located")
+        owned = s.find_element("tag", "small", tooltip, "located", 0, True)
         try:
-            self.__update_tooltip(index)
-            tooltip = selector.find_element(
-                "id", "tooltip", self.chrome_browser.driver, "located"
-            )
-            price = selector.find_element("class", "price", tooltip, "located")
-            owned = selector.find_element("tag", "small", tooltip, "located")
-            assert bool(price) and bool(owned)
-            price_text = price.text
-            owned_text = owned.text
-            assert bool(price_text) and bool(owned_text)
-            price = text2float(price_text)
-            owned = int(owned_text.split(" ")[-1])
-            value = 0
-            cps = 0
-            if owned > 0:
-                stats_elems = selector.find_element(
-                    "css", ".data > b", tooltip, "all_located", ignore_timeout=True
-                )
+            name = name.text if name else name
+            price = text2float(price.text) if price else price
+            owned = int(owned.text.split(" ")[-1]) if owned else owned
+            value, cps = None, None
+            if owned and owned > 0:
+                stats_elems = s.find_element("css", ".data > b", tooltip, "all_located")
+                assert bool(stats_elems)
                 stats_text = [i.text for i in stats_elems]
                 assert all([bool(i) for i in stats_text])
                 stats = [text2float(e) for e in stats_text]
@@ -356,13 +336,16 @@ class CookieClicker:
         product_classes = set(product.get_attribute("class").split(" "))
         product_id = product.get_attribute("id")
         product_idx = int(product_id.replace("product", ""))
-        product_name = selector.find_element("class", "title", product, "located").text
+        product_name = s.find_element("class", "title", product, "located").text
         metadata = {
             "name": product_name,
             "classes": product_classes,
             "index": product_idx,
         }
         return metadata
+
+    def find_by_id(self, id):
+        return s.find_element("id", id, self.browser.driver, "located")
 
     def get_upgrade_metadata(self, upgrade):
         upgrade_classes = set(upgrade.get_attribute("class").split(" "))
